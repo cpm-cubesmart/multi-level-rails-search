@@ -50,6 +50,20 @@ class ExportTest < Minitest::Test
     assert_includes out, "- ↑ called by Report#total  — app/models/report.rb:3  [dismissed]\n"
   end
 
+  def test_repeat_nodes_are_tagged
+    sess = build
+    sess.roots.first.add_child(Mls::Node.new(kind: :method, name: "Checkout#summary", file: "app/services/checkout.rb",
+                                             line: 18, direction: :up, repeat: true))
+    assert_includes Mls::Export.render(sess), "- ↑ called by Checkout#summary  — app/services/checkout.rb:18  [see above]\n"
+  end
+
+  def test_tree_view_row_marks_repeats
+    n = Mls::Node.new(kind: :method, name: "A#b", file: "a.rb", line: 1, direction: :up, repeat: true)
+    row = Mls::Ansi.strip(Mls::UI::TreeView.row(n, false))
+    assert_includes row, "↺"
+    assert_includes row, "(see above)"
+  end
+
   def test_multiple_roots_separated_by_blank_line
     sess = build
     sess.add_root(Mls::Node.new(kind: :class, name: "Checkout", file: "app/services/checkout.rb", line: 1,

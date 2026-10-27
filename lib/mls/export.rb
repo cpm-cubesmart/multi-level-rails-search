@@ -68,6 +68,7 @@ module Mls
         tags << node.def_kind.to_s if node.def_kind && node.kind == :method && node.def_kind != :def
         tags << "class" if node.kind == :class
         tags << "site" if node.kind == :site
+        tags << "see above" if node.repeat
         tags << node.status.to_s if node.status != :unmarked
         parts << "[#{tags.join(', ')}]" unless tags.empty?
         parts.join("  ")

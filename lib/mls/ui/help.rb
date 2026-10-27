@@ -13,6 +13,8 @@ module Mls
         Exploring
           /   search a method name or ClassName → pick definitions → new root(s)
           u   callers (up): who calls the selected node → pick sites → children "↑ called by"
+          U   auto-up: climb callers of callers automatically (asks for a max depth, blank = unlimited;
+              Esc stops; 500-node cap). Callers already in the tree become "↺ (see above)" leaves.
           d   callees (down): what the selected node calls → pick → children "↓ calls"
           i   implementations: other definitions of the same name (resolves "?" placeholders)
 

@@ -92,6 +92,17 @@ class ModelTest < Minitest::Test
     assert_equal ["spec/**", "lib/**"], sess.excludes
   end
 
+  def test_repeat_round_trip_and_merge_sites
+    n = Mls::Node.new(kind: :method, name: "A#b", file: "a.rb", line: 1, repeat: true,
+                      sites: [{ "file" => "x.rb", "line" => 1, "text" => "b", "kind" => "dot_call" }])
+    n.merge_sites([{ "file" => "x.rb", "line" => 1, "text" => "b", "kind" => "dot_call" },
+                   { "file" => "x.rb", "line" => 2, "text" => "b", "kind" => "dot_call" }])
+    assert_equal 2, n.sites.size
+    back = Mls::Node.from_h(JSON.parse(JSON.generate(n.to_h)))
+    assert back.repeat
+    refute Mls::Node.from_h("kind" => "method", "name" => "x").repeat
+  end
+
   def test_load_or_new
     Dir.mktmpdir do |dir|
       s = Mls::Session.load_or_new(File.join(dir, "s.json"), root_path: FIXTURE_ROOT)

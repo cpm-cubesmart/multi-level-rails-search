@@ -129,7 +129,7 @@ module Mls
       end
 
       def status_bar(cols)
-        text = @message || "u callers  d callees  i impls  / search  y/n mark  m note  x delete  v view  o edit  e export  F filters  ? help  q quit"
+        text = @message || "u callers  U auto-up  d callees  i impls  / search  y/n mark  m note  x delete  v view  o edit  e export  F filters  ? help  q quit"
         Ansi.style(Ansi.fit(text, cols), :reverse)
       end
 
@@ -165,6 +165,7 @@ module Mls
         when "+", "=" then expand_all(node) if node
         when "/" then action_search
         when "u" then action_callers(node) if node
+        when "U" then action_auto_up(node) if node
         when "d" then action_callees(node) if node
         when "i" then action_implementations(node) if node
         when "y" then set_status(node, :confirmed)
@@ -306,8 +307,9 @@ module Mls
           in_tree = existing.include?(group.identity)
           enclosing = s.enclosing || Ansi.style(s.owner ? "#{s.owner} (class body)" : "(no enclosing method)", :cyan)
           label = "#{Ansi.style("[#{s.kind}]".ljust(14), :dim)} #{Ansi.style(enclosing, :bold)}  #{Ansi.style("#{s.file}:#{s.line}", :dim)}  #{s.text}"
-          { label: label, checked: !in_tree, value: s, location: [s.file, s.line, s.enclosing],
-            tag: in_tree ? "(in tree)" : nil, noise: s.kind == :string }
+          noise = s.kind == :string
+          { label: label, checked: !in_tree && !noise, value: s, location: [s.file, s.line, s.enclosing],
+            tag: in_tree ? "(in tree)" : nil, noise: noise }
         end
         title = node.kind == :class ? "References to #{name}" : "Callers of #{name}"
         chosen = Picker.new(@term, title, items, source_viewer: method(:peek)).run
@@ -318,13 +320,53 @@ module Mls
         @message = "added #{added} caller node(s)"
       end
 
+      def action_auto_up(node)
+        if node.search_name.nil?
+          @message = "bare call sites have no method name to climb from"
+          return
+        end
+        answer = prompt("Auto-expand callers up to depth (blank = unlimited):")
+        return if answer.nil?
+        answer = answer.strip
+        max_depth = nil
+        unless answer.empty?
+          unless answer =~ /\A\d+\z/ && answer.to_i.positive?
+            @message = "depth must be a positive number (or blank for unlimited)"
+            return
+          end
+          max_depth = answer.to_i
+        end
+        progress = lambda do |depth:, added:, name:|
+          @message = "auto-expanding… depth #{depth}, +#{added} nodes, callers of #{name}  (Esc stops)"
+          draw
+        end
+        cancelled = -> { @term.read_key(timeout: 0) == :esc }
+        expander = Mls::Expander.new(@search, @session, max_depth: max_depth, progress: progress, cancelled: cancelled)
+        result = begin
+          expander.expand_up(node)
+        rescue Mls::Error => e
+          @message = "error: #{e.message}"
+          nil
+        end
+        node.expanded = true
+        mark_dirty
+        return unless result
+        suffix = case result.stopped
+                 when :cap then " (stopped at #{Mls::Expander::DEFAULT_MAX_NODES}-node cap)"
+                 when :cancelled then " (cancelled)"
+                 when :depth then " (depth limit)"
+                 else ""
+                 end
+        @message = "auto-expanded: +#{result.added} node(s), depth #{result.max_depth_reached}#{suffix}"
+      end
+
       # Groups sites by enclosing def and attaches/merges them as children. Returns count of new nodes.
       def attach_sites(node, sites, direction)
         added = 0
         Mls::Node.group_sites(sites).each do |group|
           child = Mls::Node.from_sites(group, direction: direction)
           if (dup = node.find_child(child.identity))
-            child.sites.each { |s| dup.sites << s unless dup.sites.any? { |x| x["file"] == s["file"] && x["line"] == s["line"] } }
+            dup.merge_sites(child.sites)
           else
             node.add_child(child)
             added += 1
@@ -383,7 +425,7 @@ module Mls
           child = Mls::Node.from_definition(d, direction: :down)
           child.sites = [site]
           if (dup = node.find_child(child.identity))
-            dup.sites << site unless dup.sites.any? { |x| x["line"] == site["line"] }
+            dup.merge_sites([site])
           else
             node.add_child(child)
             added += 1

@@ -53,6 +53,27 @@ class CliTest < Minitest::Test
     assert_equal ["app/services/**", "lib/**"], Mls::Session.load(@session).excludes
   end
 
+  def test_tree_mode
+    status, out, err = run_cli("--tree", "total")
+    assert_equal 0, status, err
+    assert_includes out, "# Billing::Order#total"
+    assert_includes out, "  - ↑ called by CheckoutsController#show"
+    assert_includes out, "[see above]"
+    refute File.exist?(@session), "tree mode does not create a session"
+
+    _, out, = run_cli("--tree", "total", "--depth", "1")
+    refute out.lines.any? { |l| l.start_with?("  - ↑") }
+    assert out.lines.any? { |l| l.start_with?("- ↑") }
+
+    status, _, err = run_cli("--depth", "1", "--callers", "total")
+    assert_equal 2, status
+    assert_includes err, "--depth only applies"
+
+    path = File.join(@dir, "t.md")
+    run_cli("--tree", "total", "--export", path)
+    assert_includes File.read(path), "# Billing::Order#total"
+  end
+
   def test_export_flag
     sess = Mls::Session.new(root_path: FIXTURE_ROOT, path: @session)
     sess.add_root(Mls::Node.new(kind: :method, name: "X#y", file: "x.rb", line: 1))

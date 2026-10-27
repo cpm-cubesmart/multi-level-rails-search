@@ -42,6 +42,8 @@ bin/mls --root APP --definitions total              # where is `total` defined?
 bin/mls --root APP --callers total                  # call-shaped references, with enclosing method
 bin/mls --root APP --callees app/models/order.rb:12-20
 bin/mls --root APP --export tree.md                 # export the saved session (add --include-dismissed)
+bin/mls --root APP --tree total                     # climb all the way up from every `total` and print the tree
+bin/mls --root APP --tree total --depth 3 --export total.md
 bin/mls --root APP --exclude spec --callers total    # all of these honour the session's excludes
 bin/mls --help
 ```
@@ -53,6 +55,7 @@ bin/mls --help
 | `j`/`k`, arrows | move · `h`/`l` collapse/expand · `Enter` toggle · `J`/`K` siblings · `g`/`G` top/bottom · `-`/`+` collapse/expand subtree |
 | `/` | search a method name or `ClassName`; chosen definitions become new roots |
 | `u` | **callers** of the selected node → pick call sites → children marked `↑ called by` |
+| `U` | **auto-up**: climb callers of callers automatically; asks for a max depth (blank = unlimited), `Esc` stops, 500-node safety cap. Callers already in the tree become `↺ (see above)` leaves |
 | `d` | **callees** of the selected node → pick calls → children marked `↓ calls` (asks which implementation when several exist) |
 | `i` | **implementations**: other definitions of the same name; resolves `? name` placeholders |
 | `y` / `n` / `space` | mark confirmed / dismissed / clear |
@@ -84,6 +87,14 @@ Ruby is dynamic, so this is textual search plus Ruby parsing, not type inference
 
 Same-named methods on other classes will show up; that is what `y`/`n` are for.
 
+## Climbing automatically
+
+Select a node and press `U` (or run `--tree NAME` from the shell) to search callers, then callers of those
+callers, and so on, breadth-first, until nothing new turns up. Every hit is attached without a picker, so
+use `y`/`n` afterwards to judge same-named matches. A method that is already anywhere in the tree (a cycle,
+or two paths converging on the same caller) is added as a `↺ (see above)` leaf and not expanded again.
+Bare view sites stop the climb; calls in a class body continue via references to that class.
+
 ## Export format
 
 ```
@@ -94,6 +105,8 @@ Same-named methods on other classes will show up; that is what `y`/`n` are for.
   - ↑ called by CheckoutsController#show  — app/controllers/checkouts_controller.rb:4
       app/controllers/checkouts_controller.rb:5: @summary = Checkout.new(@order).summary
 - ↓ calls LineItem#price  — app/models/line_item.rb:7  [attr]
+- ↑ called by Billing::Order#total?  — app/models/billing/order.rb:18
+  - ↑ called by Checkout#summary  — app/services/checkout.rb:6  [see above]
 ```
 
 ## Development

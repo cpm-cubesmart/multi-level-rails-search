@@ -27,6 +27,7 @@ module Mls
       end
 
       def arrow(node)
+        return "↺" if node.repeat
         case node.direction
         when :up then "↑"
         when :down then "↓"
@@ -67,6 +68,7 @@ module Mls
         extras << Ansi.style("[#{node.def_kind}]", :dim) if node.def_kind && !%i[def class_def].include?(node.def_kind)
         extras << Ansi.style("(#{node.sites.size} site#{'s' if node.sites.size != 1})", :dim) if node.sites.size > 1
         extras << Ansi.style("✎", :yellow) if node.note && !node.note.empty?
+        extras << Ansi.style("(see above)", :dim) if node.repeat
         "#{pad}#{glyph(node, hide_dismissed)} #{arrow(node)} #{status_mark(node)} #{name}  #{extras.join('  ')}"
       end
     end

@@ -13,11 +13,12 @@ module Mls
     DIRECTIONS = %i[root up down].freeze
 
     attr_accessor :id, :kind, :name, :file, :line, :end_line, :def_kind, :direction,
-                  :sites, :status, :note, :expanded, :children, :resolved, :parent
+                  :sites, :status, :note, :expanded, :children, :resolved, :parent, :repeat
 
     def initialize(kind:, name:, file: nil, line: nil, end_line: nil, def_kind: nil, direction: :root,
                    sites: [], status: :unmarked, note: nil, expanded: true, children: [], resolved: true,
-                   id: nil, parent: nil)
+                   id: nil, parent: nil, repeat: false)
+      @repeat = repeat
       @id = id || SecureRandom.hex(4)
       @kind = kind
       @name = name
@@ -135,6 +136,14 @@ module Mls
       children.find { |c| c.identity == identity }
     end
 
+    # Adds site hashes not already present (by file + line).
+    def merge_sites(site_hashes)
+      site_hashes.each do |s|
+        sites << s unless sites.any? { |x| x["file"] == s["file"] && x["line"] == s["line"] }
+      end
+      self
+    end
+
     def each_descendant(&blk)
       children.each do |c|
         blk.call(c)
@@ -147,7 +156,7 @@ module Mls
         "id" => id, "kind" => kind.to_s, "name" => name, "file" => file, "line" => line,
         "end_line" => end_line, "def_kind" => def_kind&.to_s, "direction" => direction.to_s,
         "sites" => sites, "status" => status.to_s, "note" => note, "expanded" => expanded,
-        "resolved" => resolved, "children" => children.map(&:to_h)
+        "resolved" => resolved, "repeat" => repeat, "children" => children.map(&:to_h)
       }
     end
 
@@ -156,7 +165,8 @@ module Mls
         id: h["id"], kind: h["kind"].to_sym, name: h["name"], file: h["file"], line: h["line"],
         end_line: h["end_line"], def_kind: h["def_kind"]&.to_sym, direction: (h["direction"] || "root").to_sym,
         sites: h["sites"] || [], status: (h["status"] || "unmarked").to_sym, note: h["note"],
-        expanded: h.fetch("expanded", true), resolved: h.fetch("resolved", true), parent: parent
+        expanded: h.fetch("expanded", true), resolved: h.fetch("resolved", true), parent: parent,
+        repeat: h.fetch("repeat", false) ? true : false
       )
       node.children = (h["children"] || []).map { |c| from_h(c, parent: node) }
       node

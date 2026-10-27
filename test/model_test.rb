@@ -72,6 +72,26 @@ class ModelTest < Minitest::Test
     assert_empty sess.roots
   end
 
+  def test_excludes_round_trip_and_defaults
+    sess, = build_session
+    sess.excludes = ["spec/**"]
+    sess.default_excludes = false
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "s.json")
+      sess.save(path)
+      loaded = Mls::Session.load(path)
+      assert_equal ["spec/**"], loaded.excludes
+      refute loaded.default_excludes
+      File.write(path, JSON.generate("root_path" => FIXTURE_ROOT, "roots" => []))
+      old = Mls::Session.load(path)
+      assert_equal [], old.excludes
+      assert old.default_excludes
+    end
+    assert sess.add_excludes(["lib"])
+    refute sess.add_excludes(["lib/"])
+    assert_equal ["spec/**", "lib/**"], sess.excludes
+  end
+
   def test_load_or_new
     Dir.mktmpdir do |dir|
       s = Mls::Session.load_or_new(File.join(dir, "s.json"), root_path: FIXTURE_ROOT)

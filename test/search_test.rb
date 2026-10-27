@@ -72,6 +72,22 @@ class SearchTest < Minitest::Test
     refute c.any? { |x| x[2].start_with?("vendor/") }
   end
 
+  def test_excludes
+    c = calls("total")
+    refute c.any? { |x| x[2].start_with?("spec/") || x[2].start_with?("test/") }, "test dirs excluded by default"
+
+    cfg = fixture_config
+    cfg.default_excludes = false
+    files = Mls::Search.new(cfg).find_callers("total").map(&:file)
+    assert_includes files, "spec/models/order_spec.rb"
+    assert_includes files, "test/models/order_test.rb"
+
+    cfg = fixture_config
+    cfg.excludes = ["app/services/**"]
+    enclosing = Mls::Search.new(cfg).find_callers("total").map(&:enclosing)
+    refute_includes enclosing, "Checkout#summary"
+  end
+
   def test_class_refs
     r = @s.find_class_refs("Billing::Order")
     assert_equal [["Billing::Order", "app/models/billing/order.rb", 4, 45]],

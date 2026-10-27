@@ -8,7 +8,8 @@ module Mls
 
     def run(argv, out: $stdout, err: $stderr)
       config = Config.new
-      opts = { export: nil, include_dismissed: false, definitions: nil, callers: nil, callees: nil }
+      opts = { export: nil, include_dismissed: false, definitions: nil, callers: nil, callees: nil,
+               excludes: [], default_excludes: nil }
       parser = OptionParser.new do |o|
         o.banner = <<~TXT
           Usage: mls [options] [NAME]
@@ -19,8 +20,8 @@ module Mls
         o.on("-r", "--root PATH", "Codebase root (default: current directory)") { |v| config.root = File.expand_path(v) }
         o.on("-s", "--session PATH", "Session file (default: ROOT/.mls/session.json)") { |v| opts[:session] = v }
         o.on("--include GLOB", "Add a file glob to search (repeatable)") { |v| config.includes << v }
-        o.on("--exclude GLOB", "Add a glob to skip (repeatable)") { |v| config.excludes << v }
-        o.on("--no-default-excludes", "Search vendor/, node_modules/, tmp/, log/ … too") { config.default_excludes = false }
+        o.on("--exclude GLOB", "Skip a dir or glob, remembered in the session (repeatable; 'spec' means spec/**)") { |v| opts[:excludes] << v }
+        o.on("--[no-]default-excludes", "Also search vendor/, spec/, test/, tmp/, log/ … (remembered)") { |v| opts[:default_excludes] = v }
         o.on("--no-rg", "Use the pure-Ruby searcher even if ripgrep is installed") { Finder.backend = :ruby }
         o.on("--export PATH", "Write the session's trees to PATH and exit") { |v| opts[:export] = v }
         o.on("--include-dismissed", "Include dismissed nodes in --export") { opts[:include_dismissed] = true }
@@ -36,6 +37,15 @@ module Mls
         err.puts "mls: root is not a directory: #{config.root}"
         return 2
       end
+
+      session = Session.load_or_new(config.session_path, root_path: config.root)
+      changed = session.add_excludes(opts[:excludes])
+      unless opts[:default_excludes].nil? || opts[:default_excludes] == session.default_excludes
+        session.default_excludes = opts[:default_excludes]
+        changed = true
+      end
+      config.apply_session(session)
+      session.save if changed
 
       search = Search.new(config)
       if opts[:definitions]
@@ -60,7 +70,6 @@ module Mls
         return 0
       end
 
-      session = Session.load_or_new(config.session_path, root_path: config.root)
       if opts[:export]
         text = Export.render(session, include_dismissed: opts[:include_dismissed])
         if opts[:export] == "-"

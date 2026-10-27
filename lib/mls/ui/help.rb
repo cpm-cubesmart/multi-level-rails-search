@@ -23,6 +23,10 @@ module Mls
         Viewing
           v   view source (]/[ jump between definition and call sites)      o   open in $EDITOR
 
+        Search scope (remembered in the session)
+          F   edit excluded dirs/globs ("spec app/assets" → spec/**, app/assets/**)
+          T   toggle the default excludes (vendor, node_modules, spec, test, features, tmp, log, public …)
+
         Session
           e   export tree(s) to a file      w   save      q   save and quit      ?   this help
 

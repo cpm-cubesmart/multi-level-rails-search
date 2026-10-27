@@ -19,6 +19,22 @@ bin/mls --root ~/code/my-rails-app Billing::Order
 Sessions live in `ROOT/.mls/session.json` (add `.mls/` to your global gitignore, or pass
 `--session PATH`). Multiple named sessions are just multiple `--session` files.
 
+### Choosing what gets searched
+
+By default `vendor/`, `node_modules/`, `spec/`, `test/`, `features/`, `tmp/`, `log/`, `public/`,
+`coverage/`, `db/schema.rb` and `db/structure.sql` are skipped. Add your own directories or globs
+and they are remembered in the session:
+
+```sh
+bin/mls --root APP --exclude spec --exclude app/assets     # bare names mean spec/**, app/assets/**
+bin/mls --root APP --no-default-excludes                   # also search vendor/, spec/, test/ … (remembered)
+bin/mls --root APP --default-excludes                      # turn the defaults back on
+```
+
+Inside the TUI, `F` edits the exclude list and `T` toggles the default excludes. The header shows
+how many globs are in effect. Changing the scope affects future searches only; nodes already in
+the tree stay.
+
 Non-interactive helpers:
 
 ```sh
@@ -26,6 +42,7 @@ bin/mls --root APP --definitions total              # where is `total` defined?
 bin/mls --root APP --callers total                  # call-shaped references, with enclosing method
 bin/mls --root APP --callees app/models/order.rb:12-20
 bin/mls --root APP --export tree.md                 # export the saved session (add --include-dismissed)
+bin/mls --root APP --exclude spec --callers total    # all of these honour the session's excludes
 bin/mls --help
 ```
 
@@ -42,6 +59,7 @@ bin/mls --help
 | `m` | edit the node's note |
 | `x` | delete node + subtree (asks first) |
 | `D` | toggle hiding dismissed nodes (also controls whether exports include them) |
+| `F` / `T` | edit excluded dirs/globs · toggle the default excludes (vendor, spec, test, …) |
 | `v` | view source; `]`/`[` jump between the definition and each call site; `o` opens `$EDITOR` |
 | `o` | open the node's file at its line in `$EDITOR` |
 | `e` | export all trees to a file (default `ROOT/.mls/export-<timestamp>.md`) |

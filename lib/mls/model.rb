@@ -166,7 +166,8 @@ module Mls
   class Session
     FORMAT = 1
 
-    attr_accessor :roots, :root_path, :created_at, :updated_at, :path, :hide_dismissed
+    attr_accessor :roots, :root_path, :created_at, :updated_at, :path, :hide_dismissed,
+                  :excludes, :default_excludes
 
     def initialize(root_path:, path: nil)
       @roots = []
@@ -175,6 +176,15 @@ module Mls
       @created_at = Time.now
       @updated_at = Time.now
       @hide_dismissed = false
+      @excludes = []
+      @default_excludes = true
+    end
+
+    # Merges extra exclude globs (normalized). Returns true when anything changed.
+    def add_excludes(globs)
+      before = @excludes.dup
+      @excludes = Config.normalize_globs(@excludes + globs)
+      @excludes != before
     end
 
     def add_root(node)
@@ -209,6 +219,7 @@ module Mls
       {
         "format" => FORMAT, "root_path" => root_path, "created_at" => created_at.iso8601,
         "updated_at" => Time.now.iso8601, "hide_dismissed" => hide_dismissed,
+        "excludes" => excludes, "default_excludes" => default_excludes,
         "roots" => roots.map(&:to_h)
       }
     end
@@ -229,6 +240,8 @@ module Mls
       s = new(root_path: root_path || h["root_path"], path: target)
       s.created_at = Time.parse(h["created_at"]) rescue Time.now
       s.hide_dismissed = h["hide_dismissed"] ? true : false
+      s.excludes = Config.normalize_globs(h["excludes"] || [])
+      s.default_excludes = h.fetch("default_excludes", true) ? true : false
       s.roots = (h["roots"] || []).map { |r| Node.from_h(r) }
       s
     end

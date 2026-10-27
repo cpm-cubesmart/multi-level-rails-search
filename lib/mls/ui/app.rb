@@ -87,8 +87,11 @@ module Mls
         left = "#{Ansi.style('mls', :bold)} #{Ansi.style(@config.root, :dim)}"
         right = +"session: #{@config.relative(@session.path)}"
         right << "   hide dismissed: #{@session.hide_dismissed ? 'on' : 'off'}"
+        right << "   excl: #{@config.all_excludes.size}#{@session.default_excludes ? '' : ' (no defaults)'}"
         right << "   backend: #{Finder.backend}"
         right << (@dirty ? "   *" : "")
+        room = cols - Ansi.width(right) - 1
+        left = Ansi.fit(left, room).rstrip if Ansi.width(left) > room && room > 8
         gap = cols - Ansi.width(left) - Ansi.width(right)
         gap = 1 if gap < 1
         Ansi.style(left + (" " * gap) + right, :underline)
@@ -126,7 +129,7 @@ module Mls
       end
 
       def status_bar(cols)
-        text = @message || "u callers  d callees  i impls  / search  y/n mark  m note  x delete  v view  o edit  e export  ? help  q quit"
+        text = @message || "u callers  d callees  i impls  / search  y/n mark  m note  x delete  v view  o edit  e export  F filters  ? help  q quit"
         Ansi.style(Ansi.fit(text, cols), :reverse)
       end
 
@@ -172,6 +175,13 @@ module Mls
         when "D"
           @session.hide_dismissed = !@session.hide_dismissed
           mark_dirty
+        when "F" then action_filters
+        when "T"
+          @session.default_excludes = !@session.default_excludes
+          @config.apply_session(@session)
+          mark_dirty
+          @message = @session.default_excludes ? "default excludes on (vendor, spec, test, tmp, log …)" :
+            "default excludes off: searching everything except your own excludes"
         when "v" then action_view(node) if node
         when "o" then open_editor(node.file, node.line) if node&.file
         when "e" then action_export
@@ -426,6 +436,15 @@ module Mls
         else
           @session.add_root(child)
         end
+      end
+
+      def action_filters
+        text = prompt("Excluded dirs/globs (space-separated; 'spec' means spec/**):", default: @session.excludes.join(" "))
+        return if text.nil?
+        @session.excludes = Config.normalize_globs(text.split(/[\s,]+/))
+        @config.apply_session(@session)
+        mark_dirty
+        @message = "excluding #{@session.excludes.size} glob(s)#{@session.default_excludes ? ' + defaults' : ''}: #{@session.excludes.join(' ')}"
       end
 
       def action_note(node)
